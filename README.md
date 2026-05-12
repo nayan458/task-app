@@ -42,6 +42,11 @@ openssl rand -hex 32
 
 ## Running Locally
 
+
+```bash
+    # create build
+    pnpm build all
+```
 Start each service in a separate terminal:
 
 ```bash
