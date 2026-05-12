@@ -20,6 +20,32 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": true,
     "strictBindCallApply": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "libs/common": [
+        "libs/common/src"
+      ],
+      "libs/common/*": [
+        "libs/common/src/*"
+      ],
+      "libs/config": [
+        "libs/config/src"
+      ],
+      "libs/config/*": [
+        "libs/config/src/*"
+      ],
+      "libs/database": [
+        "libs/database/src"
+      ],
+      "libs/database/*": [
+        "libs/database/src/*"
+      ],
+      "libs/proto": [
+        "libs/proto/src"
+      ],
+      "libs/proto/*": [
+        "libs/proto/src/*"
+      ]
+    }
   }
 }
