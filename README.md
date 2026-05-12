@@ -1,98 +1,147 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# TaskFlow API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A production-grade backend for the **TaskFlow** assignment, implemented as a NestJS monorepo with gRPC for service-to-service communication and a REST API gateway for external clients.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Architecture
 
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
-
-```bash
-$ pnpm install
+```
+┌────────────┐       HTTP / JSON       ┌──────────────┐
+│   Client   │ ──────────────────────▶ │ api-gateway  │
+└────────────┘                         │  (REST + JWT) │
+                                       └──────┬────────┘
+                                              │ gRPC (contract-first)
+                              ┌───────────────┴───────────────┐
+                              ▼                               ▼
+                       ┌─────────────┐                 ┌──────────────┐
+                       │    auth     │                 │ task-manager │
+                       │  (gRPC svc) │                 │  (gRPC svc)  │
+                       └──────┬──────┘                 └──────┬───────┘
+                              └──────────────┬────────────────┘
+                                             ▼
+                                       ┌──────────┐
+                                       │ MongoDB  │
+                                       └──────────┘
 ```
 
-## Compile and run the project
+- **api-gateway** — public HTTP surface. Handles validation (`class-validator`), JWT auth (`JwtAuthGuard` calls `Auth.ValidateToken` over gRPC), helmet, rate limiting, swagger, structured logging, and centralized error handling.
+- **auth** — gRPC microservice. Owns user registration, login, password hashing, JWT signing/validation.
+- **task-manager** — gRPC microservice. Owns CRUD + filter/search/sort over tasks, enforces creator-only updates/deletes.
+- **libs/proto** — `.proto` contracts + ts-proto generated TypeScript types + `ProtoModule` for client wiring.
+- **libs/config** — typed `ConfigService` with Joi env validation.
+- **libs/common** — global exception filter (gRPC↔HTTP), success interceptor, JWT guard, `@CurrentUser()` decorator, `@Public()` decorator.
+- **libs/database** — Mongoose connection module.
+
+## Prerequisites
+
+- Node.js 22+
+- pnpm 9+
+- MongoDB 7 (or Docker)
+
+## Setup
 
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+pnpm install
+cp .env.example .env
+pnpm proto:gen        # generates libs/proto/src/generated/*.pb.ts
 ```
 
-## Run tests
+Edit `.env` and set at minimum a strong `JWT_SECRET` (≥32 chars).
+
+## Environment variables
+
+| Variable             | Description                                           | Default |
+| -------------------- | ----------------------------------------------------- | ------- |
+| `NODE_ENV`           | `development` \| `production` \| `test`               | `development` |
+| `GATEWAY_HTTP_PORT`  | HTTP port for the api-gateway                         | `3000` |
+| `AUTH_GRPC_URL`      | Bind/connect URL for auth gRPC server (`host:port`)   | `0.0.0.0:50051` |
+| `TASK_GRPC_URL`      | Bind/connect URL for task gRPC server (`host:port`)   | `0.0.0.0:50052` |
+| `MONGO_URI`          | MongoDB connection string                             | `mongodb://localhost:27017/taskflow` |
+| `JWT_SECRET`         | Signing secret (≥32 chars, **required**)              | — |
+| `JWT_EXPIRES_IN`     | Token lifetime (`7d`, `12h`, …)                       | `7d` |
+| `THROTTLE_TTL`       | Rate-limit window in seconds                          | `60` |
+| `THROTTLE_LIMIT`     | Max requests per window per IP                        | `100` |
+| `LOG_LEVEL`          | pino log level                                        | `info` |
+
+## Running locally
+
+Open three terminals (or use a process manager):
 
 ```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+pnpm start:dev:auth          # auth gRPC service
+pnpm start:dev:task          # task-manager gRPC service
+pnpm start:dev:gateway       # REST gateway (depends on the two above)
 ```
 
-## Deployment
+When the gateway is up:
+- Swagger UI: <http://localhost:3000/docs>
+- Base URL: <http://localhost:3000/api>
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## Running with Docker
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+cp .env.example .env
+docker compose up --build
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+This brings up MongoDB, both gRPC services, and the gateway on port 3000.
 
-## Resources
+## API surface (handled by gateway)
 
-Check out a few resources that may come in handy when working with NestJS:
+| Method | Path                  | Auth   | Description                     |
+| ------ | --------------------- | ------ | ------------------------------- |
+| POST   | `/api/auth/register`  | public | Register user                   |
+| POST   | `/api/auth/login`     | public | Login, returns JWT              |
+| POST   | `/api/tasks`          | bearer | Create task                     |
+| GET    | `/api/tasks`          | bearer | List with paging/filter/sort    |
+| GET    | `/api/tasks/:id`      | bearer | Get a single task               |
+| PUT    | `/api/tasks/:id`      | bearer | Update (creator only)           |
+| DELETE | `/api/tasks/:id`      | bearer | Delete (creator only)           |
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### Query parameters for `GET /api/tasks`
 
-## Support
+`page`, `limit`, `status` (`TODO|IN_PROGRESS|DONE`), `priority` (`LOW|MEDIUM|HIGH`), `search` (matches title), `sortBy`, `order` (`asc|desc`).
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+### Response shape
 
-## Stay in touch
+Success responses are wrapped:
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+```json
+{ "success": true, "data": { ... } }
+```
 
-## License
+Error responses:
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+```json
+{ "success": false, "message": "Task not found" }
+```
+
+## Regenerating proto types
+
+After editing any `.proto` in `libs/proto/src/proto/`:
+
+```bash
+pnpm proto:gen
+```
+
+## Project structure
+
+```
+apps/
+  api-gateway/      # REST → gRPC entrypoint
+  auth/             # gRPC AuthService (stubs — implemented separately)
+  task-manager/     # gRPC TaskService (stubs — implemented separately)
+libs/
+  proto/            # .proto files + ts-proto generated types + ProtoModule
+  config/           # Joi-validated typed ConfigService
+  common/           # filters, interceptors, guards, decorators
+  database/         # Mongoose connection module
+scripts/
+  generate-proto.js # protoc + ts-proto codegen
+```
+
+## Assumptions
+
+- The `auth` service is the source of truth for JWTs. The gateway never decodes tokens locally — it calls `AuthService.ValidateToken` via gRPC. This keeps the JWT secret confined to one service and makes it trivial to add token revocation later.
+- gRPC traffic is internal — no TLS in the compose setup. In production, terminate TLS at the gateway and use mTLS or a service mesh between services.
+- Dates are strings in the proto (RFC3339) to keep the contract language-agnostic; conversion happens at the storage boundary in the task-manager service.
+- Pagination defaults: `page=1`, `limit=10`, hard cap `limit=100`.
