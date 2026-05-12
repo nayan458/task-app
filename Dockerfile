@@ -8,12 +8,13 @@ RUN corepack enable
 FROM base AS deps
 COPY package.json pnpm-lock.yaml .npmrc ./
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --ignore-scripts && \
+    pnpm install --frozen-lockfile && \
     pnpm rebuild bcrypt protobufjs @nestjs/core grpc-tools
 
 FROM base AS build
 ARG APP
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /root/.local/share/pnpm/store /root/.local/share/pnpm/store
 COPY . .
 RUN pnpm proto:gen && npx nest build ${APP}
 
@@ -24,7 +25,7 @@ WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml .npmrc ./
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --prod --ignore-scripts && \
+    pnpm install --frozen-lockfile --prod && \
     pnpm rebuild bcrypt protobufjs @nestjs/core
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/libs/proto/src/proto ./libs/proto/src/proto

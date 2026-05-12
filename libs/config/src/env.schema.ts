@@ -6,8 +6,12 @@ export const envValidationSchema = Joi.object({
     .default('development'),
 
   GATEWAY_HTTP_PORT: Joi.number().port().default(3000),
-  AUTH_GRPC_URL: Joi.string().hostname().pattern(/.*:\d+$/).required(),
-  TASK_GRPC_URL: Joi.string().hostname().pattern(/.*:\d+$/).required(),
+  AUTH_GRPC_URL: Joi.string()
+    .pattern(/^(?:[A-Za-z0-9.-]+|\d{1,3}(?:\.\d{1,3}){3}):\d+$/)
+    .required(),
+  TASK_GRPC_URL: Joi.string()
+    .pattern(/^(?:[A-Za-z0-9.-]+|\d{1,3}(?:\.\d{1,3}){3}):\d+$/)
+    .required(),
 
   MONGO_URI: Joi.string().uri({ scheme: ['mongodb', 'mongodb+srv'] }).required(),
 

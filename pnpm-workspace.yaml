@@ -5,3 +5,15 @@ allowBuilds:
   grpc-tools: set this to true or false
   protobufjs: set this to true or false
   unrs-resolver: set this to true or false
+# pnpm-workspace.yaml
+packages:
+  - "apps/*"
+  - "libs/*"
+
+onlyBuiltDependencies:
+  - "@nestjs/core"
+  - "bcrypt"
+  - "protobufjs"
+  - "grpc-tools"
+  - "@scarf/scarf"
+  - "unrs-resolver"
